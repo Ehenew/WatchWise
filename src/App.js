@@ -55,14 +55,14 @@ const average = (arr) =>
 const KEY = '6744af7c';
 
 export default function App() {
-  const [ query, setQuery ] = useState("inception");
+  const [ query, setQuery ] = useState('');
   const [ movies, setMovies ] = useState([]);
   const [ watched, setWatched ] = useState([]);
   const [ isLoading, setIsLoading ] = useState(false);
   const [ error, setError ] = useState('');
   const [ selectedId, setSelectedId ] = useState(null);
 
-  
+
   // eslint-disable-next-line no-lone-blocks
   {/* useEffect(function () {
     console.log('After intial render');
@@ -104,16 +104,16 @@ export default function App() {
         setError('');
         const res = await fetch(
           `http://www.omdbapi.com/?apikey=${ KEY }&s=${ query }`,
-        {
-          signal: controller.signal,
-        });
+          {
+            signal: controller.signal,
+          });
 
         if (!res.ok) throw new Error("💥Something went wrongwith fetching movies!");
 
         const data = await res.json();
         if (data.Response === 'False') throw new Error('Movie not found');
         setMovies(data.Search);
-        setError('')
+        setError('');
 
 
         // older way of handling async calls -> .then
@@ -138,7 +138,7 @@ export default function App() {
 
     return function () {
       controller.abort();
-    }
+    };
   }, [ query ]);
 
   return (
@@ -211,7 +211,7 @@ function NavBar({ children }) {
 function Logo() {
   return (
     <div className="logo">
-      <img src="logo.png" alt="Popcorn logo" width={84} />
+      <img src="logo.png" alt="Popcorn logo" width={ 84 } />
       <h1>WatchWise</h1>
     </div>
   );
@@ -358,8 +358,26 @@ function MovieDetails({ selectedId, onCloseMovie, onAddWatched, watched }) {
     onCloseMovie();
   }
 
+  // Closing the movie details page with Escape key
   useEffect(function () {
-    if (!title) return
+    function callback(e) {
+      if (e.code === 'Escape') {
+        onCloseMovie();
+        // console.log('CLOSING');
+      }
+    }
+
+    document.addEventListener('keydown', callback);
+
+    // cleanup function
+    return function () {
+      document.removeEventListener('keydown', callback);
+    };
+  }, [ onCloseMovie ]);
+
+
+  useEffect(function () {
+    if (!title) return;
     document.title = `Movie | ${ title }`;
 
     // cleanup function - will run before the next effect runs and after the component unmounts
@@ -367,8 +385,8 @@ function MovieDetails({ selectedId, onCloseMovie, onAddWatched, watched }) {
       document.title = 'WatchWise';
       console.log(`Cleanup effect for movie ${ title }`);
       // Why is even we have access to title here? Well it is because of closure which is a concept in JS that allows us to access the variables from the outer scope that are no longer in scope. Those variables are still accessible in the inner function. With closure, a function can remember all the variables present at the time and the place where it was created, even if the function is executed in a different scope.
-    }
-  },[title]);
+    };
+  }, [ title ]);
 
   useEffect(function () {
     setIsLoading(true);
