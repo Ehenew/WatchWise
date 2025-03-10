@@ -1,10 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import StarRating from './StarRating.js';
-import { useMovies } from "./useMovies.js";
-import { useLocalStorageState } from "./useLocalSorageState.js";
-import { useKey } from "./useKey.js";
 
-
+/* BEFORE CUSTOME HOOKS */
 const average = (arr) =>
   arr.reduce((acc, cur, i, arr) => acc + cur / arr.length, 0);
 
@@ -13,24 +10,18 @@ const KEY = '6744af7c';
 export default function App() {
   const [query, setQuery] = useState('');
   const [selectedId, setSelectedId] = useState(null);
-  // moved to the useMovies.js file
-  // const [movies, setMovies] = useState([]);
-  // const [ isLoading, setIsLoading ] = useState(false);
-  // const [ error, setError ] = useState('');
-
-  // const { movies, isLoading, error } = useMovies(query, handleCloseMovie)
-  // Custom Hooks
-  const { movies, isLoading, error } = useMovies(query);
-  const [watched, setWatched] = useLocalStorageState([], 'watched'); // our custom hook
+  const [movies, setMovies] = useState([]);
+  const [ isLoading, setIsLoading ] = useState(false);
+  const [ error, setError ] = useState('');
 
   // const [watched, setWatched] = useState([]);
   // Getting the watched movies stored in local storage at the initial reder (lazy evaluation)
   // we have to return what we want to set on the useState hook
   // useState(localStorage.getItem('watched')); does not work, it must be inside a callback function with no arguments at all, called only on initial render
-  // const [watched, setWatched] = useState(function () {
-  //   const storedMovies = localStorage.getItem('watched');
-  //   return JSON.parse(storedMovies);
-  // });
+  const [watched, setWatched] = useState(function () {
+    const storedMovies = localStorage.getItem('watched');
+    return JSON.parse(storedMovies);
+  });
 
   function handleSelectId(id) {
     setSelectedId((selectedId) => id === selectedId ? null : id);
@@ -53,12 +44,55 @@ export default function App() {
   }
 
   // Saving watched movies into local storage with useEffect
-  // useEffect(function () {
-  //   localStorage.setItem('watched', JSON.stringify(watched));
-  //   // This time the watched array is already set
-  // }, [watched])
+  useEffect(function () {
+    localStorage.setItem('watched', JSON.stringify(watched));
+    // This time the watched array is already set
+  }, [watched])
 
+useEffect(function () {
+    const controller = new AbortController();
 
+    async function fetchMovies() {
+      try {
+        setIsLoading(true);
+        setError('');
+        const res = await fetch(
+          `http://www.omdbapi.com/?apikey=${KEY}&s=${query}`,
+          {
+            signal: controller.signal,
+          });
+
+        if (!res.ok) throw new Error("💥Something went wrongwith fetching movies!");
+
+        const data = await res.json();
+        if (data.Response === 'False') throw new Error('Movie not found');
+        setMovies(data.Search);
+        setError('');
+
+      } catch (err) {
+        console.log(err.message);
+        if (err.name !== 'AbortError') {
+          setError(err.message);
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    if (query.length < 3) {
+      setMovies([]);
+      setError('');
+      return;
+    }
+    // handleCloseMovie()
+    // callback?.(); // for closing a movie
+    fetchMovies();
+
+    return function () {
+      controller.abort();
+    };
+}, [query]);
+  
   return (
     <div className="App">
       <NavBar>
@@ -138,28 +172,22 @@ function Logo() {
 function Search({ query, setQuery }) {
   const inputEl = useRef(null);
 
-  useKey('Enter', function () {
-    if (document.activeElement === inputEl.current) return;
-    inputEl.current.focus();
-    setQuery('');
-  });
+  useEffect(function () {
+    function callback(e) {
+      if (document.activeElement === inputEl.current) return;
 
-  // useEffect(function () {
-  //   function callback(e) {
-
-  //     if (e.code === 'Enter') {
-  //       if (document.activeElement === inputEl.current) return;
-  //       inputEl.current.focus();
-  //       setQuery('');
-  //     }
-  //   }
-  //   document.addEventListener('keydown', callback);
-  //   return () => document.removeEventListener('keydown', callback);
-  // }, [setQuery]);
+      if (e.code === 'Enter') {
+        inputEl.current.focus();
+        setQuery('');
+      }
+    }
+    document.addEventListener('keydown', callback);
+    return () => document.removeEventListener('keydown', callback);
+  }, [setQuery]);
 
   // auto-focus on the search bar
   // useEffect(function () {
-  // we could do however this is not declarative way, react is all about it
+  // however this is not declarative way, react is all about it
   //   const el = document.querySelector('.search');
   //   console.log(el);
   //   el.focus();
@@ -320,23 +348,22 @@ function MovieDetails({ selectedId, onCloseMovie, onAddWatched, watched }) {
     onCloseMovie();
   }
 
-  useKey('Escape', onCloseMovie);
   // // Closing the movie details page with Escape key
-  // useEffect(function () {
-  //   function callback(e) {
-  //     if (e.code === 'Escape') {
-  //       onCloseMovie();
-  //       // console.log('CLOSING');
-  //     }
-  //   }
+  useEffect(function () {
+    function callback(e) {
+      if (e.code === 'Escape') {
+        onCloseMovie();
+        // console.log('CLOSING');
+      }
+    }
 
-  //   document.addEventListener('keydown', callback);
+    document.addEventListener('keydown', callback);
 
-  //   // cleanup function
-  //   return function () {
-  //     document.removeEventListener('keydown', callback);
-  //   };
-  // }, [ onCloseMovie ]);
+    // cleanup function
+    return function () {
+      document.removeEventListener('keydown', callback);
+    };
+  }, [ onCloseMovie ]);
 
 
   useEffect(function () {
